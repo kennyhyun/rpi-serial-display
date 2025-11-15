@@ -298,7 +298,7 @@ void ssd1306_init() {
   addLog("SSD1306 initialization complete");
 }
 
-void setup_oled() {
+void setup() {
   Serial.begin(115200);
 
   // ADC 초기화
@@ -340,7 +340,8 @@ void setup_oled() {
 unsigned long timestamp = millis();
 unsigned long temp_debug_timer = 0;
 bool allowSerial = false;
-void loop_oled() {
+
+void loop() {
   frameBuffer.clear();
   int dt = millis() - timestamp;
   timestamp = millis();
@@ -367,7 +368,3 @@ void loop_oled() {
   frameBuffer.updateDisplay();
   delay(1000 / 60);
 }
-
-void setup() { setup_oled(); }
-
-void loop() { loop_oled(); }
