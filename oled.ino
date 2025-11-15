@@ -5,6 +5,7 @@
 #define SCREEN_HEIGHT 64
 #define SSD1306_I2C_ADDR 0x3C
 #define COLUMN_SIZE 16 // 한 번에 전송할 컬럼 수
+// #define COLUMN_SIZE 128 // 한 번에 전송할 컬럼 수
 
 #define NUM_POINTS 9 // 동시에 움직일 점 개수
 
@@ -202,22 +203,32 @@ void flushLogs() {
   }
 }
 
+float readVoltage(int pin) {
+  int rawValue = analogRead(pin);
+  return (rawValue * 3.3) / 4095.0;
+}
+
 unsigned long getRandomValue() {
   float tempC = analogReadTemp();
 
   char msg[64];
-  snprintf(msg, sizeof(msg), "Internal Temp: %.2f°C", tempC);
+  snprintf(msg, sizeof(msg), "Internal Temp: %.2f(C)", tempC);
   addLog(msg);
 
-  // 외부 ADC 읽기
+  // 외부 ADC 읽기 (전압으로 변환)
+  float voltA0 = readVoltage(A0);
+  float voltA1 = readVoltage(A1);
+  float voltA2 = readVoltage(A2);
+  float voltA3 = readVoltage(A3);
+
+  snprintf(msg, sizeof(msg), "A0:%.2fV A1:%.2fV A2:%.2fV A3:%.2fV", voltA0,
+           voltA1, voltA2, voltA3);
+  addLog(msg);
+
   int valA0 = analogRead(A0);
   int valA1 = analogRead(A1);
   int valA2 = analogRead(A2);
   int valA3 = analogRead(A3);
-
-  snprintf(msg, sizeof(msg), "A0:%d A1:%d A2:%d A3:%d", valA0, valA1, valA2,
-           valA3);
-  addLog(msg);
 
   unsigned long val = tempC + valA0 + valA1 + valA2 + valA3;
   snprintf(msg, sizeof(msg), "Sum: %lu", val);
@@ -340,19 +351,23 @@ void setup() {
 unsigned long timestamp = millis();
 unsigned long temp_debug_timer = 0;
 bool allowSerial = false;
+int frameCount = 0;
 
 void loop() {
   frameBuffer.clear();
   int dt = millis() - timestamp;
   timestamp = millis();
+  frameCount++;
 
-  // 3초마다 CPU 온도 로그 저장
+  // 3초마다 CPU 온도 및 FPS 로그 저장
   if (millis() - temp_debug_timer >= 3000) {
     float cpuTemp = analogReadTemp();
+    float fps = frameCount / 3.0;
     char tempMsg[64];
-    snprintf(tempMsg, sizeof(tempMsg), "CPU Temperature: %.2f(C)", cpuTemp);
+    snprintf(tempMsg, sizeof(tempMsg), "CPU: %.2f(C), FPS: %.1f", cpuTemp, fps);
     addLog(tempMsg);
     temp_debug_timer = millis();
+    frameCount = 0;
   }
 
   if (timestamp > 1000 || allowSerial) {
