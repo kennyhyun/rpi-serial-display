@@ -29,10 +29,10 @@ public:
     previous = temp;
   }
 
-  void clear(bool clearCurrent = true) {
+  void clear(bool clearCurrent = true, uint8_t clearValue = 0x00) {
     uint8_t* target = clearCurrent ? current : previous;
     for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT / 8; i++) {
-      target[i] = 0x00;
+      target[i] = clearValue;
     }
   }
 
@@ -195,8 +195,7 @@ void setup() {
     points[i] = new Point(x, y, vx, vy);
   }
 
-  frameBuffer.clear(true);
-  frameBuffer.clear(false);
+  frameBuffer.clear(false, 0xff);
 }
 
 unsigned long timestamp = millis();
