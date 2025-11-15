@@ -1,5 +1,6 @@
 {
     "port": "/dev/tty.usbmodem1301",
-    "board": "arduino:mbed_rp2040:pico",
-    "sketch": "oled.ino"
+    "board": "rp2040:rp2040:waveshare_rp2040_pizero",
+    "sketch": "oled.ino",
+    "configuration": "flash=16777216_0,freq=200,opt=Small,os=none,profile=Disabled,rtti=Disabled,stackprotect=Disabled,exceptions=Disabled,dbgport=Disabled,dbglvl=None,usbstack=picosdk,ipbtstack=ipv4only,uploadmethod=default"
 }

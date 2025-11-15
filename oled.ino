@@ -1,4 +1,5 @@
 #include <Wire.h>
+#include <hardware/adc.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -167,22 +168,101 @@ public:
 
 Point* points[NUM_POINTS];
 
-void ssd1306_init() {
-  Wire.begin();
-  Wire.beginTransmission(SSD1306_I2C_ADDR);
-  Wire.write(0x00); // 명령 모드
-  Wire.write(0xAE); // Display OFF
-  Wire.write(0x20); Wire.write(0x00); // Memory addressing mode: Horizontal
-  Wire.write(0x21); Wire.write(0); Wire.write(SCREEN_WIDTH - 1); // Column
-  Wire.write(0x22); Wire.write(0); Wire.write(SCREEN_HEIGHT / 8 - 1); // Page
-  Wire.write(0xAF); // Display ON
-  Wire.endTransmission();
+unsigned long getRandomValue() {
+  float tempC = analogReadTemp();
+  
+  Serial.print("Internal Temp (°C): ");
+  Serial.println(tempC);
+  
+  // ADC MUX 안정화
+  delay(2);
+  
+  // 외부 ADC 읽기
+  int valA0 = analogRead(A0);
+  int valA1 = analogRead(A1);
+  int valA2 = analogRead(A2);
+  int valA3 = analogRead(A3);
+  
+  Serial.print("A0: "); Serial.print(valA0);
+  Serial.print("  A1: "); Serial.print(valA1);
+  Serial.print("  A2: "); Serial.print(valA2);
+  Serial.print("  A3: "); Serial.println(valA3);
+  
+  unsigned long val = tempC + valA0 + valA1 + valA2 + valA3;
+  Serial.print("Sum: "); Serial.println(val);
+  
+  // 시간 기반 엔트로피 추가
+  unsigned long time_entropy = 0;
+  for (int i = 0; i < 10; i++) {
+    time_entropy ^= micros();
+    delayMicroseconds(1);
+  }
+
+  Serial.print("Stime_entropyum: "); Serial.println(time_entropy);
+
+  return (unsigned long)val + time_entropy;
 }
 
-void setup() {
-  randomSeed(analogRead(0));
+
+void ssd1306_init() {
+  Serial.println("Initializing SSD1306...");
+  
   Wire.begin();
-  Wire.setClock(400000); // 400kHz
+  
+  // 완전한 초기화 시퀀스
+  uint8_t init_cmds[] = {
+    0xAE,       // Display OFF
+    0xD5, 0x80, // Set display clock divide ratio
+    0xA8, 0x3F, // Set multiplex ratio (64)
+    0xD3, 0x00, // Set display offset
+    0x40,       // Set start line
+    0x8D, 0x14, // Charge pump setting (enable)
+    0x20, 0x00, // Memory addressing mode (horizontal)
+    0xA1,       // Set segment re-map
+    0xC8,       // Set COM output scan direction
+    0xDA, 0x12, // Set COM pins hardware configuration
+    0x81, 0xCF, // Set contrast control
+    0xD9, 0xF1, // Set pre-charge period
+    0xDB, 0x40, // Set VCOMH deselect level
+    0xA4,       // Entire display ON (resume to RAM content)
+    0xA6,       // Set normal display
+    0x2E,       // Deactivate scroll
+    0xAF        // Display ON
+  };
+  
+  for(int i = 0; i < sizeof(init_cmds); i++) {
+    Wire.beginTransmission(SSD1306_I2C_ADDR);
+    Wire.write(0x00); // Command mode
+    Wire.write(init_cmds[i]);
+    byte error = Wire.endTransmission();
+    
+    if(error != 0) {
+      Serial.print("I2C error at cmd ");
+      Serial.print(i);
+      Serial.print(": ");
+      Serial.println(error);
+    }
+    delay(1);
+  }
+  
+  Serial.println("SSD1306 initialization complete");
+}
+
+void setup_oled() {
+  Serial.begin(115200);
+  delay(1000);
+  
+  // ADC 초기화
+  adc_init();
+  analogReadResolution(12);
+  
+  Serial.println("Starting OLED bouncing balls...");
+  
+  randomSeed(getRandomValue());
+  // randomSeed(123456);
+  
+  Wire.begin();
+  Wire.setClock(1000000); // 1MHz (최고 속도)
   ssd1306_init();
 
   for (int i = 0; i < NUM_POINTS; i++) {
@@ -196,17 +276,111 @@ void setup() {
   }
 
   frameBuffer.clear(false, 0xff);
+  frameBuffer.clear();
+  frameBuffer.updateDisplay();
+  frameBuffer.clear(true, 0xff);
+  frameBuffer.updateDisplay();
 }
 
 unsigned long timestamp = millis();
-void loop() {
+unsigned long temp_debug_timer = 0;
+void loop_oled() {
   frameBuffer.clear();
   int dt = millis() - timestamp;
   timestamp = millis();
+  
   for (int i = 0; i < NUM_POINTS; i++) {
     points[i]->update(dt);
     frameBuffer.setPixel(points[i]->x, points[i]->y, true);
   }
   frameBuffer.updateDisplay();
   delay(30);
+}
+
+void i2c_scan() {
+  Serial.println("I2C Scanner");
+  Wire.begin();
+  
+  int nDevices = 0;
+  for(byte address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    byte error = Wire.endTransmission();
+    
+    if (error == 0) {
+      Serial.print("I2C device found at address 0x");
+      if (address < 16) Serial.print("0");
+      Serial.print(address, HEX);
+      Serial.println(" !");
+      nDevices++;
+    }
+  }
+  
+  if (nDevices == 0) {
+    Serial.println("No I2C devices found");
+  } else {
+    Serial.print("Found ");
+    Serial.print(nDevices);
+    Serial.println(" device(s)");
+  }
+}
+
+void oled_test() {
+  Serial.println("Testing OLED display...");
+  
+  Wire.begin();
+  Wire.setClock(1000000); // 1MHz
+  ssd1306_init();
+  
+  delay(100);
+  
+  // 간단한 패턴 테스트
+  Serial.println("Drawing test pattern...");
+  
+  // 페이지별로 데이터 전송
+  for(int page = 0; page < 8; page++) {
+    // 페이지 설정
+    Wire.beginTransmission(SSD1306_I2C_ADDR);
+    Wire.write(0x00); // Command mode
+    Wire.write(0xB0 + page); // Set page
+    Wire.write(0x00); // Set column low
+    Wire.write(0x10); // Set column high
+    Wire.endTransmission();
+    
+    // 데이터 전송
+    Wire.beginTransmission(SSD1306_I2C_ADDR);
+    Wire.write(0x40); // Data mode
+    
+    for(int col = 0; col < 128; col++) {
+      // 체크보드 패턴
+      uint8_t pattern = ((page + col/8) % 2) ? 0xFF : 0x00;
+      Wire.write(pattern);
+      
+      if(col % 16 == 15) {
+        Wire.endTransmission();
+        Wire.beginTransmission(SSD1306_I2C_ADDR);
+        Wire.write(0x40);
+      }
+    }
+    Wire.endTransmission();
+    
+    Serial.print("Page ");
+    Serial.print(page);
+    Serial.println(" done");
+    delay(200);
+  }
+  
+  Serial.println("Test pattern complete");
+}
+
+void setup_test() {
+  Serial.begin(115200);
+}
+
+void setup() {
+  // setup_test();  // 온도 테스트 모드
+  setup_oled();  // OLED 모드
+}
+
+void loop() {
+  loop_oled();
 }
