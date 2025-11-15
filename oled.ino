@@ -367,5 +367,6 @@ void loop() {
   }
 
   frameBuffer.updateDisplay();
+
   delay(1000 / 60);
 }
