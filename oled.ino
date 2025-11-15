@@ -330,8 +330,9 @@ void setup() {
 
   // ADC 초기화
   adc_init();
+
   analogReadResolution(12);
-  
+
   i2c_reset();
 
   addLog("Starting OLED bouncing balls...");
