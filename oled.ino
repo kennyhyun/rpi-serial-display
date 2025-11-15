@@ -365,7 +365,7 @@ void loop() {
     points[i]->update(dt);
     frameBuffer.setPixel(points[i]->x, points[i]->y, true);
   }
-  
+
   frameBuffer.updateDisplay();
   delay(1000 / 60);
 }
