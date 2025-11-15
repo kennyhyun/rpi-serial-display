@@ -1,3 +1,4 @@
+#include <U8g2lib.h>
 #include <Wire.h>
 #include <hardware/adc.h>
 
@@ -11,6 +12,8 @@
 
 #define PAGE_TO_SHIFT 2   // 프레임 갱신 생략할 라인이 속한 페이지 (0부터)
 #define LINES_TO_DELETE 2 // 프레임 갱신 생략할 라인 수
+
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
 class FrameBuffer {
 public:
@@ -46,6 +49,19 @@ public:
       current[page * SCREEN_WIDTH + x] |= (1 << bit);
     else
       current[page * SCREEN_WIDTH + x] &= ~(1 << bit);
+  }
+
+  void drawText(int x, int y, const char *text) {
+    // U8g2 버퍼에 텍스트 그리기
+    u8g2.setDrawColor(1);
+    u8g2.setCursor(x, y + 8); // U8g2는 baseline 기준
+    u8g2.print(text);
+
+    // U8g2 버퍼를 우리 버퍼로 복사
+    uint8_t *u8g2_buffer = u8g2.getBufferPtr();
+    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT / 8; i++) {
+      current[i] |= u8g2_buffer[i];
+    }
   }
 
   void updateDisplay() {
@@ -352,6 +368,8 @@ unsigned long timestamp = millis();
 unsigned long temp_debug_timer = 0;
 bool allowSerial = false;
 int frameCount = 0;
+float currentTemp = 0;
+float currentFPS = 0;
 
 void loop() {
   frameBuffer.clear();
@@ -359,7 +377,6 @@ void loop() {
   timestamp = millis();
   frameCount++;
 
-  // 3초마다 CPU 온도 및 FPS 로그 저장
   if (millis() - temp_debug_timer >= 3000) {
     float cpuTemp = analogReadTemp();
     float fps = frameCount / 3.0;
@@ -368,7 +385,18 @@ void loop() {
     addLog(tempMsg);
     temp_debug_timer = millis();
     frameCount = 0;
+
+    currentTemp = cpuTemp;
+    currentFPS = fps;
   }
+
+  // OLED에 온도와 FPS 표시
+  u8g2.clearBuffer();
+  char tempStr[16], fpsStr[16];
+  snprintf(tempStr, sizeof(tempStr), "%.1f°C", currentTemp);
+  snprintf(fpsStr, sizeof(fpsStr), "%.1fFPS", currentFPS);
+  frameBuffer.drawText(0, -1, tempStr);
+  frameBuffer.drawText(0, 8, fpsStr);
 
   if (timestamp > 1000 || allowSerial) {
     // 저장된 로그 출력 (시리얼 버퍼에 여유가 있을 때)
