@@ -6,7 +6,7 @@
 #define SSD1306_I2C_ADDR 0x3C
 #define COLUMN_SIZE 16  // 한 번에 전송할 컬럼 수
 
-#define NUM_POINTS 3  // 동시에 움직일 점 개수
+#define NUM_POINTS 9  // 동시에 움직일 점 개수
 
 #define PAGE_TO_SHIFT 2 // 프레임 갱신 생략할 라인이 속한 페이지 (0부터)
 #define LINES_TO_DELETE 2 // 프레임 갱신 생략할 라인 수
@@ -168,14 +168,46 @@ public:
 
 Point* points[NUM_POINTS];
 
+// 로그 버퍼링 시스템
+#define LOG_BUFFER_SIZE 10
+struct LogEntry {
+  unsigned long timestamp;
+  char message[64];
+};
+
+LogEntry logBuffer[LOG_BUFFER_SIZE];
+int logWriteIndex = 0;
+int logReadIndex = 0;
+int logCount = 0;
+
+void addLog(const char* msg) {
+  if (logCount < LOG_BUFFER_SIZE) {
+    logBuffer[logWriteIndex].timestamp = millis();
+    strncpy(logBuffer[logWriteIndex].message, msg, 63);
+    logBuffer[logWriteIndex].message[63] = '\0';
+    logWriteIndex = (logWriteIndex + 1) % LOG_BUFFER_SIZE;
+    logCount++;
+  }
+}
+
+void flushLogs() {
+  while (logCount > 0 && Serial.availableForWrite() > 64) {
+    Serial.print("[");
+    Serial.print(logBuffer[logReadIndex].timestamp);
+    Serial.print("] ");
+    Serial.println(logBuffer[logReadIndex].message);
+    
+    logReadIndex = (logReadIndex + 1) % LOG_BUFFER_SIZE;
+    logCount--;
+  }
+}
+
 unsigned long getRandomValue() {
   float tempC = analogReadTemp();
   
-  Serial.print("Internal Temp (°C): ");
-  Serial.println(tempC);
-  
-  // ADC MUX 안정화
-  delay(2);
+  char msg[64];
+  snprintf(msg, sizeof(msg), "Internal Temp: %.2f°C", tempC);
+  addLog(msg);
   
   // 외부 ADC 읽기
   int valA0 = analogRead(A0);
@@ -183,38 +215,33 @@ unsigned long getRandomValue() {
   int valA2 = analogRead(A2);
   int valA3 = analogRead(A3);
   
-  Serial.print("A0: "); Serial.print(valA0);
-  Serial.print("  A1: "); Serial.print(valA1);
-  Serial.print("  A2: "); Serial.print(valA2);
-  Serial.print("  A3: "); Serial.println(valA3);
+  snprintf(msg, sizeof(msg), "A0:%d A1:%d A2:%d A3:%d", valA0, valA1, valA2, valA3);
+  addLog(msg);
   
   unsigned long val = tempC + valA0 + valA1 + valA2 + valA3;
-  Serial.print("Sum: "); Serial.println(val);
+  snprintf(msg, sizeof(msg), "Sum: %lu", val);
+  addLog(msg);
   
   // 시간 기반 엔트로피 추가
-  unsigned long time_entropy = 0;
-  for (int i = 0; i < 10; i++) {
-    time_entropy ^= micros();
-    delayMicroseconds(1);
-  }
-
-  Serial.print("Stime_entropyum: "); Serial.println(time_entropy);
+  unsigned long time_entropy = micros();
+  snprintf(msg, sizeof(msg), "Time entropy: %lu", time_entropy);
+  addLog(msg);
 
   return (unsigned long)val + time_entropy;
 }
 
 
 void i2c_reset() {
-  Serial.println("Resetting I2C bus...");
+  addLog("Resetting I2C bus...");
   Wire.end();
-  delay(100);
+  delay(50);
   Wire.begin();
-  Wire.setClock(100000); // 100kHz
-  delay(100);
+  Wire.setClock(1000000); // 1MHz
+  delay(10);
 }
 
 void ssd1306_init() {
-  Serial.println("Initializing SSD1306...");
+  addLog("Initializing SSD1306...");
   
   // I2C 버스 리셋
   i2c_reset();
@@ -247,53 +274,55 @@ void ssd1306_init() {
     byte error = Wire.endTransmission();
     
     if(error != 0) {
-      Serial.print("I2C error at cmd ");
-      Serial.print(i);
-      Serial.print(": ");
-      Serial.println(error);
+      char msg[64];
+      snprintf(msg, sizeof(msg), "I2C error at cmd %d: %d", i, error);
+      addLog(msg);
       
       // 에러 시 재시도
       if(error == 5) { // timeout
-        Serial.println("Timeout detected, resetting I2C...");
+        addLog("Timeout detected, resetting I2C...");
         i2c_reset();
-        delay(100);
+        delay(10);
         // 재시도
         Wire.beginTransmission(SSD1306_I2C_ADDR);
         Wire.write(0x00);
         Wire.write(init_cmds[i]);
         error = Wire.endTransmission();
         if(error == 0) {
-          Serial.println("Retry successful");
+          addLog("Retry successful");
         }
       }
     }
-    delay(1);
+
   }
   
-  Serial.println("SSD1306 initialization complete");
+  addLog("SSD1306 initialization complete");
 }
 
 void setup_oled() {
   Serial.begin(115200);
-  delay(1000);
   
   // ADC 초기화
   adc_init();
   analogReadResolution(12);
   
-  Serial.println("Starting OLED bouncing balls...");
-  
   // I2C 초기화 (안정성 우선)
   Wire.begin();
-  Wire.setClock(100000); // 100kHz
-  delay(500); // 안정화 대기
+  Wire.setClock(100000); // 100kHz 초기화용
+  // delay(600); // 안정화 대기
   
+  addLog("Starting OLED bouncing balls...");
+
   // I2C 스캔
   i2c_scan();
   
   randomSeed(getRandomValue());
   
   ssd1306_init();
+  
+  // 초기화 완료 후 고속 모드로 전환
+  Wire.setClock(1000000); // 1MHz (최고 속도)
+  addLog("I2C speed set to 1MHz");
 
   for (int i = 0; i < NUM_POINTS; i++) {
     int x = random(0, SCREEN_WIDTH);
@@ -306,25 +335,43 @@ void setup_oled() {
   }
 
   frameBuffer.clear(false, 0xff);
+
+  delay(100);
 }
 
 unsigned long timestamp = millis();
 unsigned long temp_debug_timer = 0;
+bool allowSerial = false;
 void loop_oled() {
   frameBuffer.clear();
   int dt = millis() - timestamp;
   timestamp = millis();
   
+  // 3초마다 CPU 온도 로그 저장
+  if (millis() - temp_debug_timer >= 3000) {
+    float cpuTemp = analogReadTemp();
+    char tempMsg[64];
+    snprintf(tempMsg, sizeof(tempMsg), "CPU Temperature: %.2f(C)", cpuTemp);
+    addLog(tempMsg);
+    temp_debug_timer = millis();
+  }
+  
+  if (timestamp > 1000 || allowSerial) {
+    // 저장된 로그 출력 (시리얼 버퍼에 여유가 있을 때)
+    flushLogs();
+    allowSerial = true;
+  }
+
   for (int i = 0; i < NUM_POINTS; i++) {
     points[i]->update(dt);
     frameBuffer.setPixel(points[i]->x, points[i]->y, true);
   }
   frameBuffer.updateDisplay();
-  delay(30);
+  delay(1000 / 60);
 }
 
 void i2c_scan() {
-  Serial.println("I2C Scanner");
+  addLog("I2C Scanner");
   Wire.begin();
   
   int nDevices = 0;
@@ -333,25 +380,24 @@ void i2c_scan() {
     byte error = Wire.endTransmission();
     
     if (error == 0) {
-      Serial.print("I2C device found at address 0x");
-      if (address < 16) Serial.print("0");
-      Serial.print(address, HEX);
-      Serial.println(" !");
+      char msg[64];
+      snprintf(msg, sizeof(msg), "I2C device found at 0x%02X", address);
+      addLog(msg);
       nDevices++;
     }
   }
   
   if (nDevices == 0) {
-    Serial.println("No I2C devices found");
+    addLog("No I2C devices found");
   } else {
-    Serial.print("Found ");
-    Serial.print(nDevices);
-    Serial.println(" device(s)");
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Found %d device(s)", nDevices);
+    addLog(msg);
   }
 }
 
 void oled_test() {
-  Serial.println("Testing OLED display...");
+  addLog("Testing OLED display...");
   
   Wire.begin();
   Wire.setClock(1000000); // 1MHz
@@ -360,7 +406,7 @@ void oled_test() {
   delay(100);
   
   // 간단한 패턴 테스트
-  Serial.println("Drawing test pattern...");
+  addLog("Drawing test pattern...");
   
   // 페이지별로 데이터 전송
   for(int page = 0; page < 8; page++) {
@@ -389,13 +435,13 @@ void oled_test() {
     }
     Wire.endTransmission();
     
-    Serial.print("Page ");
-    Serial.print(page);
-    Serial.println(" done");
-    delay(200);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Page %d done", page);
+    addLog(msg);
+    delay(50);
   }
   
-  Serial.println("Test pattern complete");
+  addLog("Test pattern complete");
 }
 
 void setup_test() {
