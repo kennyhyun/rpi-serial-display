@@ -322,6 +322,10 @@ void ssd1306_init() {
     }
   }
 
+  u8g2.begin();
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.enableUTF8Print(); // UTF-8 지원 활성화
+  u8g2.clearBuffer();
   addLog("SSD1306 initialization complete");
 }
 
