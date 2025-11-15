@@ -204,10 +204,20 @@ unsigned long getRandomValue() {
 }
 
 
+void i2c_reset() {
+  Serial.println("Resetting I2C bus...");
+  Wire.end();
+  delay(100);
+  Wire.begin();
+  Wire.setClock(100000); // 100kHz
+  delay(100);
+}
+
 void ssd1306_init() {
   Serial.println("Initializing SSD1306...");
   
-  Wire.begin();
+  // I2C 버스 리셋
+  i2c_reset();
   
   // 완전한 초기화 시퀀스
   uint8_t init_cmds[] = {
@@ -241,6 +251,21 @@ void ssd1306_init() {
       Serial.print(i);
       Serial.print(": ");
       Serial.println(error);
+      
+      // 에러 시 재시도
+      if(error == 5) { // timeout
+        Serial.println("Timeout detected, resetting I2C...");
+        i2c_reset();
+        delay(100);
+        // 재시도
+        Wire.beginTransmission(SSD1306_I2C_ADDR);
+        Wire.write(0x00);
+        Wire.write(init_cmds[i]);
+        error = Wire.endTransmission();
+        if(error == 0) {
+          Serial.println("Retry successful");
+        }
+      }
     }
     delay(1);
   }
@@ -258,11 +283,16 @@ void setup_oled() {
   
   Serial.println("Starting OLED bouncing balls...");
   
-  randomSeed(getRandomValue());
-  // randomSeed(123456);
-  
+  // I2C 초기화 (안정성 우선)
   Wire.begin();
-  Wire.setClock(1000000); // 1MHz (최고 속도)
+  Wire.setClock(100000); // 100kHz
+  delay(500); // 안정화 대기
+  
+  // I2C 스캔
+  i2c_scan();
+  
+  randomSeed(getRandomValue());
+  
   ssd1306_init();
 
   for (int i = 0; i < NUM_POINTS; i++) {
@@ -276,10 +306,6 @@ void setup_oled() {
   }
 
   frameBuffer.clear(false, 0xff);
-  frameBuffer.clear();
-  frameBuffer.updateDisplay();
-  frameBuffer.clear(true, 0xff);
-  frameBuffer.updateDisplay();
 }
 
 unsigned long timestamp = millis();
