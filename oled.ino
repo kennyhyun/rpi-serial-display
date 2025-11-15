@@ -259,7 +259,7 @@ unsigned long getRandomValue() {
 }
 
 void i2c_reset() {
-  addLog("Resetting I2C bus...");
+  addLog("Initializing I2C...");
   Wire.end();
   delay(50);
   Wire.begin();
@@ -270,10 +270,6 @@ void i2c_reset() {
 void ssd1306_init() {
   addLog("Initializing SSD1306...");
 
-  // I2C 버스 리셋
-  i2c_reset();
-
-  // 완전한 초기화 시퀀스
   uint8_t init_cmds[] = {
       0xAE,       // Display OFF
       0xD5, 0x80, // Set display clock divide ratio
@@ -324,7 +320,7 @@ void ssd1306_init() {
 
   u8g2.begin();
   u8g2.setFont(u8g2_font_6x10_tf);
-  u8g2.enableUTF8Print(); // UTF-8 지원 활성화
+  u8g2.enableUTF8Print();
   u8g2.clearBuffer();
   addLog("SSD1306 initialization complete");
 }
@@ -335,11 +331,8 @@ void setup() {
   // ADC 초기화
   adc_init();
   analogReadResolution(12);
-
-  // I2C 초기화 (안정성 우선)
-  Wire.begin();
-  Wire.setClock(100000); // 100kHz 초기화용
-  // delay(600); // 안정화 대기
+  
+  i2c_reset();
 
   addLog("Starting OLED bouncing balls...");
 
