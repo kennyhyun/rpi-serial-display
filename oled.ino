@@ -4,27 +4,45 @@
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
+#define LINES_PER_PAGE 8
 #define SSD1306_I2C_ADDR 0x3C
 #define COLUMN_SIZE 16 // 한 번에 전송할 컬럼 수
 // #define COLUMN_SIZE 128 // 한 번에 전송할 컬럼 수
 
 #define NUM_POINTS 9 // 동시에 움직일 점 개수
 
-#define PAGE_TO_SHIFT 2   // 프레임 갱신 생략할 라인이 속한 페이지 (0부터)
-#define LINES_TO_DELETE 2 // 프레임 갱신 생략할 라인 수
-
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
 class FrameBuffer {
 public:
-  uint8_t buffer1[SCREEN_WIDTH * SCREEN_HEIGHT / 8];
-  uint8_t buffer2[SCREEN_WIDTH * SCREEN_HEIGHT / 8];
+  uint8_t *buffer1;
+  uint8_t *buffer2;
   uint8_t *current;
   uint8_t *previous;
+  int bufferHeight;
+  int pageToSkip;
+  int linesToSkip;
 
-  FrameBuffer() {
+  FrameBuffer(int skipLines = 0, int skipPage = 0) {
+    linesToSkip = skipLines;
+    pageToSkip = skipPage;
+    if (linesToSkip > 0) {
+      bufferHeight =
+          SCREEN_HEIGHT + (LINES_PER_PAGE / linesToSkip) * LINES_PER_PAGE;
+    } else {
+      bufferHeight = SCREEN_HEIGHT;
+    }
+
+    int bufferSize = SCREEN_WIDTH * bufferHeight / 8;
+    buffer1 = new uint8_t[bufferSize];
+    buffer2 = new uint8_t[bufferSize];
     current = buffer1;
     previous = buffer2;
+  }
+
+  ~FrameBuffer() {
+    delete[] buffer1;
+    delete[] buffer2;
   }
 
   void swap() {
@@ -35,13 +53,13 @@ public:
 
   void clear(bool clearCurrent = true, uint8_t clearValue = 0x00) {
     uint8_t *target = clearCurrent ? current : previous;
-    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT / 8; i++) {
+    for (int i = 0; i < SCREEN_WIDTH * bufferHeight / 8; i++) {
       target[i] = clearValue;
     }
   }
 
   void setPixel(int x, int y, bool on) {
-    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT)
+    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= bufferHeight)
       return;
     int page = y / 8;
     int bit = y % 8;
@@ -73,7 +91,7 @@ public:
         for (int col = chunk; col < chunk_end; col++) {
           int idx = page * SCREEN_WIDTH + col;
 
-          if (page >= PAGE_TO_SHIFT) {
+          if (linesToSkip > 0 && page >= pageToSkip) {
             // 16비트 데이터 구성 (LSB가 상단)
             uint16_t curr_16 = (uint16_t)current[idx];
             uint16_t prev_16 = (uint16_t)previous[idx];
@@ -84,8 +102,8 @@ public:
               prev_16 |= (uint16_t)previous[next_idx] << 8;
             }
 
-            // 마스크: 하위 LINES_TO_DELETE 비트 제거
-            uint16_t mask = 0x00FF << LINES_TO_DELETE;
+            // 마스크: 하위 linesToSkip 비트 제거
+            uint16_t mask = 0x00FF << linesToSkip;
             curr_16 &= mask;
             prev_16 &= mask;
 
@@ -115,7 +133,7 @@ public:
             int idx = page * SCREEN_WIDTH + col;
             uint8_t data;
 
-            if (page >= PAGE_TO_SHIFT) {
+            if (linesToSkip > 0 && page >= pageToSkip) {
               // 16비트 데이터 구성 (LSB가 상단)
               uint16_t data_16 = (uint16_t)current[idx];
               if (page < SCREEN_HEIGHT / 8 - 1) {
@@ -123,8 +141,8 @@ public:
                 data_16 |= (uint16_t)current[next_idx] << 8;
               }
 
-              // LINES_TO_DELETE만큼 시프트하여 라인 제거
-              data = data_16 >> LINES_TO_DELETE;
+              // linesToSkip만큼 시프트하여 라인 제거
+              data = data_16 >> linesToSkip;
             } else {
               data = current[idx];
             }
@@ -144,7 +162,7 @@ public:
   }
 };
 
-FrameBuffer frameBuffer;
+FrameBuffer frameBuffer(2, 2); // Skip 2 lines, start from page 2
 
 class Point {
 public:
@@ -328,9 +346,7 @@ void ssd1306_init() {
 void setup() {
   Serial.begin(115200);
 
-  // ADC 초기화
   adc_init();
-
   analogReadResolution(12);
 
   i2c_reset();
