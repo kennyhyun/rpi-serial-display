@@ -11,6 +11,10 @@
 
 #define NUM_POINTS 9 // 동시에 움직일 점 개수
 
+// 8x8 아이콘 배열 (하트 모양)
+const uint8_t icon8x8[8] = {0b01100110, 0b11111111, 0b11111111, 0b11111111,
+                            0b01111110, 0b00111100, 0b00011000, 0b00000000};
+
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
 class FrameBuffer {
@@ -67,6 +71,17 @@ public:
       current[page * SCREEN_WIDTH + x] |= (1 << bit);
     else
       current[page * SCREEN_WIDTH + x] &= ~(1 << bit);
+  }
+
+  void drawIcon(int x, int y, const uint8_t *icon) {
+    for (int row = 0; row < 8; row++) {
+      uint8_t line = icon[row];
+      for (int col = 0; col < 8; col++) {
+        if (line & (0x80 >> col)) {
+          setPixel(x + col, y + row, true);
+        }
+      }
+    }
   }
 
   void drawText(int x, int y, const char *text) {
@@ -177,7 +192,7 @@ public:
   }
 
   void update(int dt) {
-    int dx = vx * dt / 16; // 16ms 기준으로 정규화
+    int dx = vx * dt / 16;
     int dy = vy * dt / 16;
     x += dx;
     y += dy;
@@ -201,7 +216,46 @@ public:
   }
 };
 
+class Icon {
+public:
+  float x, y;
+  float vx, vy;
+  const uint8_t *iconData;
+
+  Icon(float posX = 60, float posY = 0) {
+    x = posX;
+    y = posY;
+    vx = 0;
+    vy = 0;
+    iconData = icon8x8;
+  }
+
+  void update(float dt) {
+    vy += 9.8 * dt;
+    x += vx * dt;
+    y += vy * dt;
+
+    if (x < 0) {
+      x = 0;
+      vx = -vx;
+    }
+    if (x > SCREEN_WIDTH - 8) {
+      x = SCREEN_WIDTH - 8;
+      vx = -vx;
+    }
+    if (y > SCREEN_HEIGHT - 8) {
+      y = SCREEN_HEIGHT - 8;
+      vy = -vy;
+    }
+    if (y < 0) {
+      y = 0;
+      vy = -vy;
+    }
+  }
+};
+
 Point *points[NUM_POINTS];
+Icon bouncingIcon;
 
 // 로그 버퍼링 시스템
 #define LOG_BUFFER_SIZE 10
@@ -351,7 +405,7 @@ void setup() {
 
   i2c_reset();
 
-  addLog("Starting OLED bouncing balls...");
+  addLog("Starting OLED bouncing icon...");
 
   randomSeed(getRandomValue());
 
@@ -361,6 +415,7 @@ void setup() {
   Wire.setClock(1000000); // 1MHz (최고 속도)
   addLog("I2C speed set to 1MHz");
 
+  // Point들 초기화
   for (int i = 0; i < NUM_POINTS; i++) {
     int x = random(0, SCREEN_WIDTH);
     int y = random(0, SCREEN_HEIGHT);
@@ -372,6 +427,9 @@ void setup() {
       vy = 1;
     points[i] = new Point(x, y, vx, vy);
   }
+
+  // 아이콘 초기화 (화면 중앙 상단에서 시작)
+  bouncingIcon = Icon(SCREEN_WIDTH / 2 - 4, 0);
 
   frameBuffer.clear(false, 0xff);
 
@@ -387,7 +445,7 @@ float currentFPS = 0;
 
 void loop() {
   frameBuffer.clear();
-  int dt = millis() - timestamp;
+  float dt = (millis() - timestamp) / 1000.0; // 초 단위로 변환
   timestamp = millis();
   frameCount++;
 
@@ -418,10 +476,17 @@ void loop() {
     allowSerial = true;
   }
 
+  // Point들 업데이트 및 그리기
+  int dt_ms = dt * 1000; // Point는 ms 단위 사용
   for (int i = 0; i < NUM_POINTS; i++) {
-    points[i]->update(dt);
+    points[i]->update(dt_ms);
     frameBuffer.setPixel(points[i]->x, points[i]->y, true);
   }
+
+  // 아이콘 업데이트 및 그리기
+  bouncingIcon.update(dt);
+  frameBuffer.drawIcon((int)bouncingIcon.x, (int)bouncingIcon.y,
+                       bouncingIcon.iconData);
 
   frameBuffer.updateDisplay();
 
