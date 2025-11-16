@@ -33,7 +33,7 @@ public:
       bufferHeight = SCREEN_HEIGHT;
     }
 
-    int bufferSize = SCREEN_WIDTH * bufferHeight / 8;
+    int bufferSize = SCREEN_WIDTH * bufferHeight / LINES_PER_PAGE;
     buffer1 = new uint8_t[bufferSize];
     buffer2 = new uint8_t[bufferSize];
     current = buffer1;
@@ -53,7 +53,7 @@ public:
 
   void clear(bool clearCurrent = true, uint8_t clearValue = 0x00) {
     uint8_t *target = clearCurrent ? current : previous;
-    for (int i = 0; i < SCREEN_WIDTH * bufferHeight / 8; i++) {
+    for (int i = 0; i < SCREEN_WIDTH * bufferHeight / LINES_PER_PAGE; i++) {
       target[i] = clearValue;
     }
   }
@@ -61,8 +61,8 @@ public:
   void setPixel(int x, int y, bool on) {
     if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= bufferHeight)
       return;
-    int page = y / 8;
-    int bit = y % 8;
+    int page = y / LINES_PER_PAGE;
+    int bit = y % LINES_PER_PAGE;
     if (on)
       current[page * SCREEN_WIDTH + x] |= (1 << bit);
     else
@@ -77,13 +77,13 @@ public:
 
     // U8g2 버퍼를 우리 버퍼로 복사
     uint8_t *u8g2_buffer = u8g2.getBufferPtr();
-    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT / 8; i++) {
+    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT / LINES_PER_PAGE; i++) {
       current[i] |= u8g2_buffer[i];
     }
   }
 
   void updateDisplay() {
-    for (int page = 0; page < SCREEN_HEIGHT / 8; page++) {
+    for (int page = 0; page < SCREEN_HEIGHT / LINES_PER_PAGE; page++) {
       for (int chunk = 0; chunk < SCREEN_WIDTH; chunk += COLUMN_SIZE) {
         bool chunk_changed = false;
         int chunk_end = min(chunk + COLUMN_SIZE, SCREEN_WIDTH);
@@ -96,10 +96,10 @@ public:
             uint16_t curr_16 = (uint16_t)current[idx];
             uint16_t prev_16 = (uint16_t)previous[idx];
 
-            if (page < SCREEN_HEIGHT / 8 - 1) {
+            if (page < SCREEN_HEIGHT / LINES_PER_PAGE - 1) {
               int next_idx = (page + 1) * SCREEN_WIDTH + col;
-              curr_16 |= (uint16_t)current[next_idx] << 8;
-              prev_16 |= (uint16_t)previous[next_idx] << 8;
+              curr_16 |= (uint16_t)current[next_idx] << LINES_PER_PAGE;
+              prev_16 |= (uint16_t)previous[next_idx] << LINES_PER_PAGE;
             }
 
             // 마스크: 하위 linesToSkip 비트 제거
@@ -136,9 +136,9 @@ public:
             if (linesToSkip > 0 && page >= pageToSkip) {
               // 16비트 데이터 구성 (LSB가 상단)
               uint16_t data_16 = (uint16_t)current[idx];
-              if (page < SCREEN_HEIGHT / 8 - 1) {
+              if (page < SCREEN_HEIGHT / LINES_PER_PAGE - 1) {
                 int next_idx = (page + 1) * SCREEN_WIDTH + col;
-                data_16 |= (uint16_t)current[next_idx] << 8;
+                data_16 |= (uint16_t)current[next_idx] << LINES_PER_PAGE;
               }
 
               // linesToSkip만큼 시프트하여 라인 제거
