@@ -60,34 +60,6 @@ void DisplayBuffer::transform8x8Icon(const uint8_t *horizontalIcon,
   }
 }
 
-// Merge text buffer at specific position in display buffer
-void DisplayBuffer::mergeTextBuffer(const TextBuffer &textBuf, int destX,
-                                    int destY) {
-  if (!textBuf.buffer)
-    return;
-
-  int textWidth = textBuf.width();
-  int textHeight = textBuf.height();
-
-  // Simple byte-level merge for SSD1306 format (page-aligned)
-  int textPages = (textHeight + 7) / 8;
-
-  for (int page = 0; page < textPages; page++) {
-    int destPage = (destY / 8) + page;
-    if (destPage >= height / 8)
-      break;
-
-    for (int x = 0; x < textWidth && (destX + x) < width; x++) {
-      int srcIndex = x + page * textWidth;
-      int destIndex = (destX + x) + destPage * width;
-
-      if (srcIndex < textBuf.bufferSize && destIndex < bufferSize) {
-        current[destIndex] |= textBuf.buffer[srcIndex];
-      }
-    }
-  }
-}
-
 void DisplayBuffer::orByteColumn(int x, int page, uint8_t data) {
   if (x < 0 || x >= width || page < 0 || page >= (height + linesToSkip + 7) / 8)
     return;

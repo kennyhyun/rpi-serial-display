@@ -206,7 +206,7 @@ void loop() {
   frameStart = micros();
 
   displayBuffer.clear();
-  displayBuffer.drawTestPattern();
+  // displayBuffer.drawTestPattern();
   int dt = millis() - timestamp; // ms 단위
   timestamp = millis();
   frameCount++;
