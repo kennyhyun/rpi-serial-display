@@ -1,4 +1,4 @@
-#include <U8g2lib.h>
+
 #include <Wire.h>
 #include <hardware/adc.h>
 
@@ -26,6 +26,7 @@ Movable *objects[NUM_POINTS + 1];
 DisplayBuffer displayBuffer;
 SSD1306Driver driver;
 Logger logger;
+TextBuffer textBuffer;
 
 float readVoltage(int pin) {
   int rawValue = analogRead(pin);
@@ -146,9 +147,6 @@ void setup() {
 
   ssd1306_init();
 
-  // Initialize text system after I2C is ready
-  displayBuffer.initText();
-
   // 초기화 완료 후 고속 모드로 전환
   Wire.setClock(1000000); // 1MHz (최고 속도)
   logger.addLog("I2C speed set to 1MHz");
@@ -165,9 +163,9 @@ void setup() {
       vy = 1;
     objects[i] = new BouncingPoint(x, y, vx, vy);
   }
-  // Create FallingIcon with actual size (8x7) and movementScale 100
+  // Create FallingIcon with actual size (8x7) starting from top
   FallingIcon *heart =
-      new FallingIcon(SCREEN_WIDTH / 2 - 4, 10, heartIcon_vertical, 8, 7, 100);
+      new FallingIcon(SCREEN_WIDTH / 2 - 4, 0, heartIcon_vertical, 8, 7, 100);
   heart->vx = random(-20, 21);
   heart->vy = 0.0; // Ensure vy starts at 0
 
@@ -215,12 +213,29 @@ void loop() {
     objects[i]->draw(displayBuffer);
   }
 
-  // OLED에 온도와 FPS 표시 (통합된 displayBuffer 시스템 사용)
+  // OLED에 온도와 FPS 표시 (Adafruit_GFX 사용)
   char tempStr[16], fpsStr[16];
-  snprintf(tempStr, sizeof(tempStr), "%.1f°C", currentTemp);
-  snprintf(fpsStr, sizeof(fpsStr), "%.1f FPS", currentFPS);
-  displayBuffer.drawText(0, -1, tempStr);
-  displayBuffer.drawText(0, 8, fpsStr);
+  snprintf(tempStr, sizeof(tempStr), "%.1fC", currentTemp);
+  snprintf(fpsStr, sizeof(fpsStr), "%.1f", currentFPS);
+
+  // Calculate required buffer size (font size 1 = 6x8 pixels per char)
+  int maxChars = strlen(tempStr) + strlen(fpsStr) + 2; // +2 for spacing
+  int textWidth = maxChars * 6;                        // 6 pixels per char
+  int textHeight = 8;                                  // 8 pixels height
+
+  // Resize buffer only if needed
+  textBuffer.resize(textWidth, textHeight);
+  textBuffer.setTextSize(1);
+  textBuffer.setTextColor(1);
+
+  textBuffer.setCursor(0, 0);
+  textBuffer.print(tempStr);
+  textBuffer.setCursor(strlen(tempStr) * 6 + 6,
+                       0); // Position after temp + space
+  textBuffer.print(fpsStr);
+
+  // Merge text buffer into display buffer
+  displayBuffer.mergeTextBuffer(textBuffer);
 
   if (timestamp > 1000 || allowSerial) {
     // 저장된 로그 출력 (시리얼 버퍼에 여유가 있을 때)

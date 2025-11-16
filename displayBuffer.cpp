@@ -1,7 +1,6 @@
 #include "displayBuffer.h"
 #include "driver.h"
 #include <Arduino.h>
-#include <U8g2lib.h>
 
 void DisplayBuffer::setPixel(int x, int y, bool on) {
   if (x < 0 || x >= width || y < 0 || y >= height)
@@ -60,16 +59,10 @@ void DisplayBuffer::transform8x8Icon(const uint8_t *horizontalIcon,
   }
 }
 
-void DisplayBuffer::drawText(int x, int y, const char *text) {
-  u8g2.clearBuffer();
-  u8g2.setDrawColor(1);
-  u8g2.setCursor(x, y + 8);
-  u8g2.print(text);
-
-  // Copy u8g2 buffer to our buffer (u8g2 won't send to I2C)
-  uint8_t *u8g2_buffer = u8g2.getBufferPtr();
-  for (int i = 0; i < width * height / 8; i++) {
-    current[i] |= u8g2_buffer[i];
+// Merge text buffer into current display buffer
+void DisplayBuffer::mergeTextBuffer(const TextBuffer &textBuf) {
+  for (int i = 0; i < bufferSize && i < textBuf.bufferSize; i++) {
+    current[i] |= textBuf.buffer[i];
   }
 }
 

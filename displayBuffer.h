@@ -1,6 +1,59 @@
 #pragma once
-#include <U8g2lib.h>
+#include <Adafruit_GFX.h>
 #include <cstdint>
+
+// Separate text rendering buffer with dynamic allocation
+class TextBuffer : public Adafruit_GFX {
+public:
+  uint8_t *buffer;
+  int bufferSize;
+  int allocatedSize;
+
+  TextBuffer()
+      : Adafruit_GFX(0, 0), buffer(nullptr), bufferSize(0), allocatedSize(0) {}
+
+  ~TextBuffer() {
+    if (buffer)
+      delete[] buffer;
+  }
+
+  void resize(int w, int h) {
+    int newSize = w * h / 8;
+
+    if (newSize > allocatedSize) {
+      // Need larger buffer - reallocate
+      if (buffer)
+        delete[] buffer;
+      buffer = new uint8_t[newSize];
+      allocatedSize = newSize;
+    }
+
+    // Update dimensions and buffer size
+    _width = w;
+    _height = h;
+    bufferSize = newSize;
+    clear();
+  }
+
+  void drawPixel(int16_t x, int16_t y, uint16_t color) override {
+    if (x < 0 || x >= _width || y < 0 || y >= _height || !buffer)
+      return;
+
+    int byteIndex = x + (y / 8) * _width;
+    int bitIndex = y % 8;
+
+    if (color > 0) {
+      buffer[byteIndex] |= (1 << bitIndex);
+    } else {
+      buffer[byteIndex] &= ~(1 << bitIndex);
+    }
+  }
+
+  void clear() {
+    if (buffer)
+      memset(buffer, 0, bufferSize);
+  }
+};
 
 class DisplayDriver;
 
@@ -16,28 +69,21 @@ public:
   uint8_t *current, *previous;
   bool *dirtyRegions;
   Orientation orientation;
-  U8G2_SSD1306_128X64_NONAME_F_2ND_HW_I2C u8g2;
 
   DisplayBuffer(int w = 128, int h = 64, int bpp = 1,
                 Orientation orient = VERTICAL)
       : width(w), height(h), bitsPerPixel(bpp), orientation(orient),
-        bufferWidth(w), bufferSize(w * h / (8 / bpp)),
-        u8g2(U8G2_R0, U8X8_PIN_NONE) {
+        bufferWidth(w), bufferSize(w * h / (8 / bpp)) {
     current = new uint8_t[bufferSize];
     previous = new uint8_t[bufferSize];
     dirtyRegions = new bool[h / (8 / bpp)];
   }
 
-  void initText() {
-    u8g2.begin();
-    u8g2.setFont(u8g2_font_6x10_tf);
-    u8g2.enableUTF8Print();
-  }
-
   void setPixel(int x, int y, bool on);
   void draw8x8Icon(int x, int y,
                    const uint8_t *verticalIcon); // 8x8 vertical icon only
-  void drawText(int x, int y, const char *text);
+  void
+  mergeTextBuffer(const TextBuffer &textBuf); // Merge text rendering result
   void orByteColumn(int x, int page, uint8_t data);
   void clear();
 
