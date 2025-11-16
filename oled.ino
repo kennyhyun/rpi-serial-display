@@ -187,8 +187,16 @@ bool allowSerial = false;
 int frameCount = 0;
 float currentTemp = 0;
 float currentFPS = 0;
+float currentAvgDelay = 0;
+
+const unsigned long TARGET_FRAME_MS = 16667; // 60 FPS = 16.667ms
+unsigned long frameStart;
+unsigned long totalDelayTime = 0;
+int delayCount = 0;
 
 void loop() {
+  frameStart = micros();
+
   displayBuffer.clear();
   int dt = millis() - timestamp; // ms 단위
   timestamp = millis();
@@ -197,14 +205,21 @@ void loop() {
   if (millis() - temp_debug_timer >= 3000) {
     float cpuTemp = analogReadTemp();
     float fps = frameCount / 3.0;
+    float avgDelay =
+        delayCount > 0 ? (float)totalDelayTime / delayCount / 1000.0 : 0;
     char tempMsg[64];
-    snprintf(tempMsg, sizeof(tempMsg), "CPU: %.2f(C), FPS: %.1f", cpuTemp, fps);
+    snprintf(tempMsg, sizeof(tempMsg),
+             "CPU: %.2f(C), FPS: %.1f, AvgDelay: %.2fms", cpuTemp, fps,
+             avgDelay);
     logger.addLog(tempMsg);
     temp_debug_timer = millis();
     frameCount = 0;
+    totalDelayTime = 0;
+    delayCount = 0;
 
     currentTemp = cpuTemp;
     currentFPS = fps;
+    currentAvgDelay = avgDelay;
   }
 
   // 모든 객체 업데이트 및 그리기
@@ -213,15 +228,17 @@ void loop() {
     objects[i]->draw(displayBuffer);
   }
 
-  // OLED에 온도와 FPS 표시 (Adafruit_GFX 사용)
-  char tempStr[16], fpsStr[16];
+  // OLED에 온도, FPS, 평균 딜레이 표시
+  char tempStr[16], fpsStr[16], delayStr[16];
   snprintf(tempStr, sizeof(tempStr), "%.1fC", currentTemp);
-  snprintf(fpsStr, sizeof(fpsStr), "%.1f", currentFPS);
+  snprintf(fpsStr, sizeof(fpsStr), "%.1ffps", currentFPS);
+  snprintf(delayStr, sizeof(delayStr), "%.1fms", currentAvgDelay);
 
   // Calculate required buffer size (font size 1 = 6x8 pixels per char)
-  int maxChars = strlen(tempStr) + strlen(fpsStr) + 2; // +2 for spacing
-  int textWidth = maxChars * 6;                        // 6 pixels per char
-  int textHeight = 8;                                  // 8 pixels height
+  int maxChars =
+      strlen(tempStr) + strlen(fpsStr) + strlen(delayStr) + 4; // +4 for spacing
+  int textWidth = maxChars * 6; // 6 pixels per char
+  int textHeight = 8;           // 8 pixels height
 
   // Resize buffer only if needed
   textBuffer.resize(textWidth, textHeight);
@@ -230,8 +247,12 @@ void loop() {
 
   textBuffer.setCursor(0, 0);
   textBuffer.print(tempStr);
-  textBuffer.setCursor(strlen(tempStr) * 6 + 6, 0);
+  int xPos = strlen(tempStr) * 6 + 6;
+  textBuffer.setCursor(xPos, 0);
   textBuffer.print(fpsStr);
+  xPos += strlen(fpsStr) * 6 + 6;
+  textBuffer.setCursor(xPos, 0);
+  textBuffer.print(delayStr);
 
   displayBuffer.mergeTextBuffer(textBuffer, 0, 0);
 
@@ -243,5 +264,12 @@ void loop() {
 
   displayBuffer.updateDisplay(driver);
 
-  delay(1000 / 60);
+  // Dynamic frame timing for 60 FPS
+  unsigned long frameTime = micros() - frameStart;
+  if (frameTime < TARGET_FRAME_MS) {
+    unsigned long delayTime = TARGET_FRAME_MS - frameTime;
+    delayMicroseconds(delayTime);
+    totalDelayTime += delayTime;
+    delayCount++;
+  }
 }
