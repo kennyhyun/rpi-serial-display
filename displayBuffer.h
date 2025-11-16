@@ -28,7 +28,7 @@ public:
       allocatedSize = newSize;
     }
 
-    // Update dimensions and buffer size
+    // Update dimensions and buffer size using Adafruit_GFX constructor
     _width = w;
     _height = h;
     bufferSize = newSize;
@@ -53,6 +53,9 @@ public:
     if (buffer)
       memset(buffer, 0, bufferSize);
   }
+
+  int getWidth() const { return _width; }
+  int getHeight() const { return _height; }
 };
 
 class DisplayDriver;
@@ -66,24 +69,35 @@ class DisplayBuffer {
 public:
   const int width, height, bitsPerPixel;
   const int bufferWidth, bufferSize;
-  uint8_t *current, *previous;
+  uint8_t *current, *previous, *chunkData;
   bool *dirtyRegions;
   Orientation orientation;
+  int linesToSkip, pageToSkip, chunkSize;
 
   DisplayBuffer(int w = 128, int h = 64, int bpp = 1,
-                Orientation orient = VERTICAL)
+                Orientation orient = VERTICAL, int skipLines = 0,
+                int skipFromPage = 0, int chunkSz = 16)
       : width(w), height(h), bitsPerPixel(bpp), orientation(orient),
-        bufferWidth(w), bufferSize(w * h / (8 / bpp)) {
+        bufferWidth(w), bufferSize(w * h / (8 / bpp)), linesToSkip(skipLines),
+        pageToSkip(skipFromPage), chunkSize(chunkSz) {
     current = new uint8_t[bufferSize];
     previous = new uint8_t[bufferSize];
+    chunkData = new uint8_t[chunkSize];
     dirtyRegions = new bool[h / (8 / bpp)];
+  }
+
+  ~DisplayBuffer() {
+    delete[] current;
+    delete[] previous;
+    delete[] chunkData;
+    delete[] dirtyRegions;
   }
 
   void setPixel(int x, int y, bool on);
   void draw8x8Icon(int x, int y,
                    const uint8_t *verticalIcon); // 8x8 vertical icon only
-  void
-  mergeTextBuffer(const TextBuffer &textBuf); // Merge text rendering result
+  void mergeTextBuffer(const TextBuffer &textBuf, int destX,
+                       int destY); // Merge text at specific position
   void orByteColumn(int x, int page, uint8_t data);
   void clear();
 

@@ -230,12 +230,10 @@ void loop() {
 
   textBuffer.setCursor(0, 0);
   textBuffer.print(tempStr);
-  textBuffer.setCursor(strlen(tempStr) * 6 + 6,
-                       0); // Position after temp + space
+  textBuffer.setCursor(strlen(tempStr) * 6 + 6, 0);
   textBuffer.print(fpsStr);
 
-  // Merge text buffer into display buffer
-  displayBuffer.mergeTextBuffer(textBuffer);
+  displayBuffer.mergeTextBuffer(textBuffer, 0, 0);
 
   if (timestamp > 1000 || allowSerial) {
     // 저장된 로그 출력 (시리얼 버퍼에 여유가 있을 때)

@@ -27,6 +27,29 @@ void SSD1306Driver::updateRegion(int page, int startCol, int endCol,
   Wire.endTransmission();
 }
 
+void SSD1306Driver::setPosition(int page, int col) {
+  Wire.beginTransmission(SSD1306_I2C_ADDR);
+  Wire.write(0x00);
+  Wire.write(0xB0 + page);
+  Wire.write(col & 0x0F);
+  Wire.write(0x10 | (col >> 4));
+  Wire.endTransmission();
+}
+
+void SSD1306Driver::writeData(uint8_t *data, int length) {
+  Wire.beginTransmission(SSD1306_I2C_ADDR);
+  Wire.write(0x40);
+  for (int i = 0; i < length; i++) {
+    Wire.write(data[i]);
+    if ((i + 1) % 32 == 0 && i + 1 < length) {
+      Wire.endTransmission();
+      Wire.beginTransmission(SSD1306_I2C_ADDR);
+      Wire.write(0x40);
+    }
+  }
+  Wire.endTransmission();
+}
+
 void SSD1306Driver::init() {
   // Implementation in main file
 }
