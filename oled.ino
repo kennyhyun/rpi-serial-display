@@ -13,7 +13,6 @@
 #define LINES_PER_PAGE 8
 #define SSD1306_I2C_ADDR 0x3C
 #define COLUMN_SIZE 16 // 한 번에 전송할 컬럼 수
-// #define COLUMN_SIZE 128 // 한 번에 전송할 컬럼 수
 
 #define NUM_POINTS 9 // 동시에 움직일 점 개수
 

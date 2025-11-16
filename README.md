@@ -43,14 +43,35 @@ A high-performance Arduino sketch for Raspberry Pi Pico that displays animated b
 
 ## Configuration
 
+### Main Settings
 ```cpp
 #define NUM_POINTS 9        // Number of bouncing balls
-#define COLUMN_SIZE 16      // I2C chunk size for updates
-#define LOG_BUFFER_SIZE 10  // Serial log buffer size
+#define SCREEN_WIDTH 128    // Display width
+#define SCREEN_HEIGHT 64    // Display height
+```
 
-// FrameBuffer constructor
-FrameBuffer frameBuffer(2, 2);   // Skip 2 lines starting from page 2
-// FrameBuffer frameBuffer(0, 0);   // Disable optimization (standard mode)
+### DisplayBuffer Configuration
+```cpp
+// DisplayBuffer(width, height, bitsPerPixel, orientation, linesToSkip, pageToSkip, chunkSize)
+DisplayBuffer displayBuffer(128, 64, 1, VERTICAL, 2, 2, 16);
+
+// Parameters:
+// - width: 128 pixels
+// - height: 64 pixels
+// - bitsPerPixel: 1 (monochrome)
+// - orientation: VERTICAL
+// - linesToSkip: 2 (line skip optimization)
+// - pageToSkip: 2 (start skipping from page 2)
+// - chunkSize: 16 (I2C chunk size for updates)
+```
+
+### Movable Objects
+```cpp
+// BouncingPoint(x, y, velocityX, velocityY, movementScale)
+new BouncingPoint(x, y, vx, vy, 16);
+
+// FallingIcon(x, y, iconData, width, height, movementScale)
+new FallingIcon(64, 0, heartIcon_vertical, 8, 7, 100);
 ```
 
 ## Performance
