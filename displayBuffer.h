@@ -99,6 +99,8 @@ public:
   void mergeTextBuffer(const TextBuffer &textBuf, int destX,
                        int destY); // Merge text at specific position
   void orByteColumn(int x, int page, uint8_t data);
+  void mergeBufferRegion(uint8_t *srcBuffer, int startPage, int endPage,
+                         int startCol, int endCol);
   void clear();
 
   // Utility function: transform horizontal icon to vertical format

@@ -95,6 +95,16 @@ void DisplayBuffer::orByteColumn(int x, int page, uint8_t data) {
   current[byteIndex] |= data;
 }
 
+void DisplayBuffer::mergeBufferRegion(uint8_t *srcBuffer, int startPage,
+                                      int endPage, int startCol, int endCol) {
+  for (int page = startPage; page < endPage && page < height / 8; page++) {
+    for (int col = startCol; col < endCol && col < width; col++) {
+      int idx = page * width + col;
+      current[idx] |= srcBuffer[idx];
+    }
+  }
+}
+
 void DisplayBuffer::clear() { memset(current, 0, bufferSize); }
 
 void DisplayBuffer::swap() {

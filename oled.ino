@@ -1,4 +1,5 @@
 
+#include <U8g2lib.h>
 #include <Wire.h>
 #include <hardware/adc.h>
 
@@ -26,7 +27,8 @@ Movable *objects[NUM_POINTS + 1];
 DisplayBuffer displayBuffer;
 SSD1306Driver driver;
 Logger logger;
-TextBuffer textBuffer;
+U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/SCL, /* data=*/SDA,
+                                         /* reset=*/U8X8_PIN_NONE);
 
 float readVoltage(int pin) {
   int rawValue = analogRead(pin);
@@ -140,6 +142,11 @@ void setup() {
 
   logger.addLog("Starting OLED bouncing icon...");
 
+  // Initialize U8g2
+  u8g2.begin();
+  u8g2.enableUTF8Print();
+  u8g2.setFont(u8g2_font_6x10_tf);
+
   // Transform heart icon to vertical format
   DisplayBuffer::transform8x8Icon(heartIcon_horizontal, heartIcon_vertical);
 
@@ -208,9 +215,8 @@ void loop() {
     float avgDelay =
         delayCount > 0 ? (float)totalDelayTime / delayCount / 1000.0 : 0;
     char tempMsg[64];
-    snprintf(tempMsg, sizeof(tempMsg),
-             "CPU: %.2f(C), FPS: %.1f, AvgDelay: %.2fms", cpuTemp, fps,
-             avgDelay);
+    snprintf(tempMsg, sizeof(tempMsg), "CPU: %.2f°C, %.1ffps, AvgDelay: %.2fms",
+             cpuTemp, fps, avgDelay);
     logger.addLog(tempMsg);
     temp_debug_timer = millis();
     frameCount = 0;
@@ -228,33 +234,19 @@ void loop() {
     objects[i]->draw(displayBuffer);
   }
 
-  // OLED에 온도, FPS, 평균 딜레이 표시
-  char tempStr[16], fpsStr[16], delayStr[16];
-  snprintf(tempStr, sizeof(tempStr), "%.1fC", currentTemp);
-  snprintf(fpsStr, sizeof(fpsStr), "%.1ffps", currentFPS);
-  snprintf(delayStr, sizeof(delayStr), "%.1fms", currentAvgDelay);
+  // U8g2로 텍스트 렌더링
+  u8g2.clearBuffer();
+  u8g2.setCursor(0, 10);
+  char textStr[32];
+  snprintf(textStr, sizeof(textStr), "%.1f°C %.1ffps %.1fms", currentTemp,
+           currentFPS, currentAvgDelay);
+  u8g2.print(textStr);
 
-  // Calculate required buffer size (font size 1 = 6x8 pixels per char)
-  int maxChars =
-      strlen(tempStr) + strlen(fpsStr) + strlen(delayStr) + 4; // +4 for spacing
-  int textWidth = maxChars * 6; // 6 pixels per char
-  int textHeight = 8;           // 8 pixels height
-
-  // Resize buffer only if needed
-  textBuffer.resize(textWidth, textHeight);
-  textBuffer.setTextSize(1);
-  textBuffer.setTextColor(1);
-
-  textBuffer.setCursor(0, 0);
-  textBuffer.print(tempStr);
-  int xPos = strlen(tempStr) * 6 + 6;
-  textBuffer.setCursor(xPos, 0);
-  textBuffer.print(fpsStr);
-  xPos += strlen(fpsStr) * 6 + 6;
-  textBuffer.setCursor(xPos, 0);
-  textBuffer.print(delayStr);
-
-  displayBuffer.mergeTextBuffer(textBuffer, 0, 0);
+  // 실제 텍스트 크기로 부분 병합
+  int textWidth = u8g2.getStrWidth(textStr);
+  int textPages = (u8g2.getMaxCharHeight() + 7) / 8;
+  displayBuffer.mergeBufferRegion(u8g2.getBufferPtr(), 0, textPages, 0,
+                                  textWidth);
 
   if (timestamp > 1000 || allowSerial) {
     // 저장된 로그 출력 (시리얼 버퍼에 여유가 있을 때)

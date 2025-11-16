@@ -21,6 +21,7 @@
                 "/Users/kenny/Library/Arduino15/packages/rp2040/hardware/rp2040/5.4.2/cores/rp2040",
                 "/Users/kenny/Library/Arduino15/packages/rp2040/hardware/rp2040/5.4.2/variants/waveshare_rp2040_pizero",
                 "/Users/kenny/Library/Arduino15/packages/rp2040/hardware/rp2040/5.4.2/libraries/Wire/src",
+                "/Users/kenny/Documents/Arduino/libraries/U8g2/src",
                 "/Users/kenny/Documents/Arduino/libraries/Adafruit_GFX_Library",
                 "/Users/kenny/Documents/Arduino/libraries/Adafruit_BusIO",
                 "/Users/kenny/Library/Arduino15/packages/rp2040/hardware/rp2040/5.4.2/libraries/SPI/src",

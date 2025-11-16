@@ -55,7 +55,7 @@ FrameBuffer frameBuffer(2, 2);   // Skip 2 lines starting from page 2
 
 ## Performance
 
-- Achieves 51 FPS target with optimized partial screen updates
+- Achieves 60 FPS target with optimized partial screen updates
 - Minimal memory footprint with efficient double buffering
 - Non-blocking serial communication prevents frame drops
 - Hardware-accelerated random number generation
