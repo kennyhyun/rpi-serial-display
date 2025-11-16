@@ -173,7 +173,7 @@ void setup() {
   }
   // Create FallingIcon with actual size (8x7) starting from top
   FallingIcon *heart =
-      new FallingIcon(SCREEN_WIDTH / 2 - 4, 0, heartIcon_vertical, 8, 7, 3000);
+      new FallingIcon(SCREEN_WIDTH / 2 - 4, 0, heartIcon_vertical, 8, 7, 100);
   heart->vx = random(-20, 21);
   heart->vy = 0.0; // Ensure vy starts at 0
 
@@ -206,7 +206,7 @@ void loop() {
   frameStart = micros();
 
   displayBuffer.clear();
-  // displayBuffer.drawTestPattern();
+  displayBuffer.drawBorder();
   int dt = millis() - timestamp; // ms 단위
   timestamp = millis();
   frameCount++;
@@ -238,8 +238,9 @@ void loop() {
 
   // U8g2로 텍스트 렌더링
   u8g2.clearBuffer();
-  int cursorY = 20;
-  u8g2.setCursor(0, cursorY);
+  int cursorX = 2;
+  int cursorY = 10;
+  u8g2.setCursor(cursorX, cursorY);
   char textStr[32];
   snprintf(textStr, sizeof(textStr), "%.1f°C %.1ffps %.1fms", currentTemp,
            currentFPS, currentAvgDelay);
@@ -251,9 +252,10 @@ void loop() {
   int textStartY = cursorY - u8g2.getAscent();
   int textEndY = cursorY + u8g2.getDescent();
   int startPage = max(0, textStartY / 8);
-  int endPage = min(8, (textEndY + 7) / 8);
-  displayBuffer.mergeBufferRegion(u8g2.getBufferPtr(), startPage, endPage, 0,
-                                  textWidth);
+  int maxPages = (displayBuffer.getHeight() + 7) / 8;
+  int endPage = min(maxPages, (textEndY + 7) / 8 + 1);
+  displayBuffer.mergeBufferRegion(u8g2.getBufferPtr(), startPage, endPage,
+                                  cursorX, cursorX + textWidth);
 
   if (timestamp > 1000 || allowSerial) {
     // 저장된 로그 출력 (시리얼 버퍼에 여유가 있을 때)

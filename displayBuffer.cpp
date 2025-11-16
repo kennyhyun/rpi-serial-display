@@ -81,13 +81,13 @@ void DisplayBuffer::mergeBufferRegion(uint8_t *srcBuffer, int startPage,
 void DisplayBuffer::drawBorder() {
   int bufferHeight = getHeight();
   // Draw top and bottom borders
-  for (int x = 0; x < width; x++) {
+  for (int x = 0; x < width; x += 4) {
     setPixel(x, 0, true);                // Top border
     setPixel(x, bufferHeight - 1, true); // Bottom border (use physical height)
   }
 
   // Draw left and right borders
-  for (int y = 0; y < bufferHeight; y += 2) {
+  for (int y = 0; y < bufferHeight; y += 4) {
     setPixel(0, y, true);         // Left border
     setPixel(width - 1, y, true); // Right border
   }
