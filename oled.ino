@@ -9,7 +9,7 @@
 #define COLUMN_SIZE 16 // 한 번에 전송할 컬럼 수
 // #define COLUMN_SIZE 128 // 한 번에 전송할 컬럼 수
 
-#define NUM_POINTS 9 // 동시에 움직일 점 개수
+#define NUM_POINTS 4 // 동시에 움직일 점 개수
 
 // 8x8 아이콘 배열 (하트 모양)
 const uint8_t icon8x8[8] = {0b01100110, 0b11111111, 0b11111111, 0b11111111,
@@ -226,7 +226,7 @@ public:
     x = posX;
     y = posY;
     vx = 0;
-    vy = 0;
+    vy = -30;
     iconData = icon8x8;
   }
 
@@ -243,8 +243,9 @@ public:
       x = SCREEN_WIDTH - 8;
       vx = -vx;
     }
-    if (y > SCREEN_HEIGHT - 8) {
-      y = SCREEN_HEIGHT - 8;
+    float bottomLimit = SCREEN_HEIGHT - 2 - 8;
+    if (y >= bottomLimit) {
+      y = bottomLimit;
       vy = -vy;
     }
     if (y < 0) {
@@ -428,8 +429,8 @@ void setup() {
     points[i] = new Point(x, y, vx, vy);
   }
 
-  // 아이콘 초기화 (화면 중앙 상단에서 시작)
-  bouncingIcon = Icon(SCREEN_WIDTH / 2 - 4, 0);
+  // 아이콘 초기화 (화면 중앙 상단에서 10픽셀 아래)
+  bouncingIcon = Icon(SCREEN_WIDTH / 2 - 4, 10);
 
   frameBuffer.clear(false, 0xff);
 
@@ -483,8 +484,8 @@ void loop() {
     frameBuffer.setPixel(points[i]->x, points[i]->y, true);
   }
 
-  // 아이콘 업데이트 및 그리기
-  bouncingIcon.update(dt);
+  // 아이콘 업데이트 및 그리기 (시간 배율 적용)
+  bouncingIcon.update(dt * 5.0); // 5배 빠른 시간
   frameBuffer.drawIcon((int)bouncingIcon.x, (int)bouncingIcon.y,
                        bouncingIcon.iconData);
 
