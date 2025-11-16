@@ -15,7 +15,7 @@
 #define COLUMN_SIZE 16 // 한 번에 전송할 컬럼 수
 // #define COLUMN_SIZE 128 // 한 번에 전송할 컬럼 수
 
-#define NUM_POINTS 4 // 동시에 움직일 점 개수
+#define NUM_POINTS 9 // 동시에 움직일 점 개수
 
 // Heart icon data (horizontal format)
 const uint8_t heartIcon_horizontal[8] = {0b01100110, 0b11111111, 0b11111111,
