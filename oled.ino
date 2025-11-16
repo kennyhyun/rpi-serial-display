@@ -24,7 +24,8 @@ const uint8_t heartIcon_horizontal[8] = {0b01100110, 0b11111111, 0b11111111,
 uint8_t heartIcon_vertical[8];
 
 Movable *objects[NUM_POINTS + 1];
-DisplayBuffer displayBuffer;
+DisplayBuffer displayBuffer(128, 64, 1, VERTICAL, 2,
+                            2); // Skip 2 lines from page 2
 SSD1306Driver driver;
 Logger logger;
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/SCL, /* data=*/SDA,
