@@ -71,9 +71,11 @@ void FallingIcon::update(unsigned long currentTime,
 }
 
 void FallingIcon::draw(DisplayBuffer &buffer) {
-  // Only draw if icon is visible on screen
-  if (y >= -iconHeight && y < buffer.getHeight() && x >= -iconWidth &&
-      x < buffer.getWidth()) {
+  // Draw if any part of icon overlaps with screen
+  bool xOverlap = (x < buffer.getWidth()) && (x + iconWidth > 0);
+  bool yOverlap = (y < buffer.getHeight()) && (y + iconHeight > 0);
+
+  if (xOverlap && yOverlap) {
     buffer.draw8x8Icon((int)x, (int)y, iconData);
   }
 }

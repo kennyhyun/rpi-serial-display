@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 void DisplayBuffer::setPixel(int x, int y, bool on) {
-  if (x < 0 || x >= width || y < 0 || y >= height)
+  if (x < 0 || x >= width || y < 0 || y >= getHeight())
     return;
 
   int byteIndex = x + (y / (8 / bitsPerPixel)) * width;
@@ -18,7 +18,8 @@ void DisplayBuffer::setPixel(int x, int y, bool on) {
 
 // 8x8 vertical icon only - direct byte manipulation
 void DisplayBuffer::draw8x8Icon(int x, int y, const uint8_t *verticalIcon) {
-  if (x < 0 || y < 0 || x + 8 > width || y + 8 > height)
+  // Allow partial drawing - only skip if completely outside
+  if (x + 8 <= 0 || y + 8 <= 0 || x >= width || y >= getHeight())
     return;
 
   int startPage = y / 8;
@@ -38,7 +39,7 @@ void DisplayBuffer::draw8x8Icon(int x, int y, const uint8_t *verticalIcon) {
       orByteColumn(x + col, startPage, iconByte << yOffset);
 
       // Lower page
-      if (startPage + 1 < height / 8) {
+      if (startPage + 1 < (getHeight() + 7) / 8) {
         orByteColumn(x + col, startPage + 1, iconByte >> (8 - yOffset));
       }
     }
@@ -88,7 +89,7 @@ void DisplayBuffer::mergeTextBuffer(const TextBuffer &textBuf, int destX,
 }
 
 void DisplayBuffer::orByteColumn(int x, int page, uint8_t data) {
-  if (x < 0 || x >= width || page < 0 || page >= height / 8)
+  if (x < 0 || x >= width || page < 0 || page >= (height + linesToSkip + 7) / 8)
     return;
 
   int byteIndex = x + page * width;
@@ -105,6 +106,37 @@ void DisplayBuffer::mergeBufferRegion(uint8_t *srcBuffer, int startPage,
   }
 }
 
+void DisplayBuffer::drawBorder() {
+  int bufferHeight = getHeight();
+  // Draw top and bottom borders
+  for (int x = 0; x < width; x++) {
+    setPixel(x, 0, true);                // Top border
+    setPixel(x, bufferHeight - 1, true); // Bottom border (use physical height)
+  }
+
+  // Draw left and right borders
+  for (int y = 0; y < bufferHeight; y += 2) {
+    setPixel(0, y, true);         // Left border
+    setPixel(width - 1, y, true); // Right border
+  }
+}
+
+void DisplayBuffer::drawTestPattern() {
+  int bufferHeight = getHeight();
+
+  // Draw top and bottom borders
+  for (int x = 0; x < width; x++) {
+    setPixel(x, 0, true);                // Top border
+    setPixel(x, bufferHeight - 1, true); // Bottom border (use physical height)
+  }
+
+  // Draw left and right borders
+  for (int y = 0; y < bufferHeight; y += 2) {
+    setPixel(0 + (y / 10), y, true);         // Left border
+    setPixel(width - 1 - (y / 10), y, true); // Right border
+  }
+}
+
 void DisplayBuffer::clear() { memset(current, 0, bufferSize); }
 
 void DisplayBuffer::swap() {
@@ -114,7 +146,8 @@ void DisplayBuffer::swap() {
 }
 
 void DisplayBuffer::updateDisplay(DisplayDriver &driver) {
-  for (int page = 0; page < height / 8; page++) {
+  int numPages = (getHeight() + 7) / 8;
+  for (int page = 0; page < numPages; page++) {
     for (int chunkStart = 0; chunkStart < width; chunkStart += chunkSize) {
       bool chunk_changed = false;
       int chunk_end = min(chunkStart + chunkSize, width);
@@ -126,7 +159,7 @@ void DisplayBuffer::updateDisplay(DisplayDriver &driver) {
           uint16_t curr_16 = (uint16_t)current[idx];
           uint16_t prev_16 = (uint16_t)previous[idx];
 
-          if (page < height / 8 - 1) {
+          if (page < numPages - 1) {
             int next_idx = (page + 1) * width + col;
             curr_16 |= (uint16_t)current[next_idx] << 8;
             prev_16 |= (uint16_t)previous[next_idx] << 8;
@@ -156,7 +189,7 @@ void DisplayBuffer::updateDisplay(DisplayDriver &driver) {
 
           if (linesToSkip > 0 && page >= pageToSkip) {
             uint16_t data_16 = (uint16_t)current[idx];
-            if (page < height / 8 - 1) {
+            if (page < numPages - 1) {
               int next_idx = (page + 1) * width + col;
               data_16 |= (uint16_t)current[next_idx] << 8;
             }

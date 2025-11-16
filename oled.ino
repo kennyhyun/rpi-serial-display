@@ -25,7 +25,7 @@ uint8_t heartIcon_vertical[8];
 
 Movable *objects[NUM_POINTS + 1];
 DisplayBuffer displayBuffer(128, 64, 1, VERTICAL, 2,
-                            2); // Skip 2 lines from page 2
+                            2); // Skip 1 lines from page 2
 SSD1306Driver driver;
 Logger logger;
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/SCL, /* data=*/SDA,
@@ -173,7 +173,7 @@ void setup() {
   }
   // Create FallingIcon with actual size (8x7) starting from top
   FallingIcon *heart =
-      new FallingIcon(SCREEN_WIDTH / 2 - 4, 0, heartIcon_vertical, 8, 7, 100);
+      new FallingIcon(SCREEN_WIDTH / 2 - 4, 0, heartIcon_vertical, 8, 7, 3000);
   heart->vx = random(-20, 21);
   heart->vy = 0.0; // Ensure vy starts at 0
 
@@ -206,6 +206,7 @@ void loop() {
   frameStart = micros();
 
   displayBuffer.clear();
+  displayBuffer.drawTestPattern();
   int dt = millis() - timestamp; // ms 단위
   timestamp = millis();
   frameCount++;
@@ -237,7 +238,8 @@ void loop() {
 
   // U8g2로 텍스트 렌더링
   u8g2.clearBuffer();
-  u8g2.setCursor(0, 10);
+  int cursorY = 20;
+  u8g2.setCursor(0, cursorY);
   char textStr[32];
   snprintf(textStr, sizeof(textStr), "%.1f°C %.1ffps %.1fms", currentTemp,
            currentFPS, currentAvgDelay);
@@ -245,8 +247,12 @@ void loop() {
 
   // 실제 텍스트 크기로 부분 병합
   int textWidth = u8g2.getStrWidth(textStr);
-  int textPages = (u8g2.getMaxCharHeight() + 7) / 8;
-  displayBuffer.mergeBufferRegion(u8g2.getBufferPtr(), 0, textPages, 0,
+  int fontHeight = u8g2.getMaxCharHeight();
+  int textStartY = cursorY - u8g2.getAscent();
+  int textEndY = cursorY + u8g2.getDescent();
+  int startPage = max(0, textStartY / 8);
+  int endPage = min(8, (textEndY + 7) / 8);
+  displayBuffer.mergeBufferRegion(u8g2.getBufferPtr(), startPage, endPage, 0,
                                   textWidth);
 
   if (timestamp > 1000 || allowSerial) {
